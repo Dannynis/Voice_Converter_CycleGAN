@@ -7,6 +7,18 @@ import librosa
 from preprocess import *
 from model import CycleGAN
 
+processed_data_dir = './processed_data'
+
+
+def load_speaker_features(file_path):
+
+    mcep_params = np.load(file_path, allow_pickle=True)
+    f0s = mcep_params['f0s']
+    timeaxes = mcep_params['timeaxes']
+    sps = mcep_params['sps']
+    aps = mcep_params['aps']
+    coded_sps = mcep_params['coded_sps']
+    return f0s,timeaxes,sps,aps,coded_sps
 
 def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validation_A_dir, validation_B_dir, output_dir, tensorboard_log_dir):
 
@@ -16,24 +28,38 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
     mini_batch_size = 1 # mini_batch_size = 1 is better
     generator_learning_rate = 0.0002
     generator_learning_rate_decay = generator_learning_rate / 200000
-    discriminator_learning_rate = 0.0001
+    discriminator_learning_rate = 0.000001
     discriminator_learning_rate_decay = discriminator_learning_rate / 200000
     sampling_rate = 16000
     num_mcep = 24
     frame_period = 5.0
-    n_frames = 128
+    n_frames = 64
     lambda_cycle = 10
     lambda_identity = 5
 
-    print('Preprocessing Data...')
-
+    Speaker_A_features = os.path.join(processed_data_dir, 'wav_A.npz')
+    Speaker_B_features = os.path.join(processed_data_dir, 'wav_B.npz')
     start_time = time.time()
+    if os.path.exists(Speaker_A_features) and os.path.exists(Speaker_B_features):
+        print ('#### loading processed data #######')
+        f0s_A, timeaxes_A, sps_A, aps_A, coded_sps_A = load_speaker_features(Speaker_A_features)
+        f0s_B, timeaxes_B, sps_B, aps_B, coded_sps_B = load_speaker_features(Speaker_B_features)
+    else:
+        print('Preprocessing Data...')
 
-    wavs_A = load_wavs(wav_dir = train_A_dir, sr = sampling_rate)
-    wavs_B = load_wavs(wav_dir = train_B_dir, sr = sampling_rate)
 
-    f0s_A, timeaxes_A, sps_A, aps_A, coded_sps_A = world_encode_data(wavs = wavs_A, fs = sampling_rate, frame_period = frame_period, coded_dim = num_mcep)
-    f0s_B, timeaxes_B, sps_B, aps_B, coded_sps_B = world_encode_data(wavs = wavs_B, fs = sampling_rate, frame_period = frame_period, coded_dim = num_mcep)
+
+        wavs_A = load_wavs(wav_dir = train_A_dir, sr = sampling_rate)
+        wavs_B = load_wavs(wav_dir = train_B_dir, sr = sampling_rate)
+
+        f0s_A, timeaxes_A, sps_A, aps_A, coded_sps_A = world_encode_data(wavs = wavs_A, fs = sampling_rate, frame_period = frame_period, coded_dim = num_mcep)
+        f0s_B, timeaxes_B, sps_B, aps_B, coded_sps_B = world_encode_data(wavs = wavs_B, fs = sampling_rate, frame_period = frame_period, coded_dim = num_mcep)
+        if not os.path.exists(processed_data_dir):
+            os.makedirs(processed_data_dir)
+
+        np.savez(Speaker_A_features, f0s = f0s_A, timeaxes = timeaxes_A, sps = sps_A, aps = aps_A,coded_sps=coded_sps_A)
+        np.savez(Speaker_B_features, f0s = f0s_B, timeaxes = timeaxes_B, sps = sps_B, aps = aps_B,coded_sps=coded_sps_B)
+
 
     log_f0s_mean_A, log_f0s_std_A = logf0_statistics(f0s_A)
     log_f0s_mean_B, log_f0s_std_B = logf0_statistics(f0s_B)
@@ -73,7 +99,7 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
 
     print('Time Elapsed for Data Preprocessing: %02d:%02d:%02d' % (time_elapsed // 3600, (time_elapsed % 3600 // 60), (time_elapsed % 60 // 1)))
 
-    model = CycleGAN(num_features = num_mcep)
+    model = CycleGAN(num_features = num_mcep,log_dir=tensorboard_log_dir)
 
     for epoch in range(num_epochs):
         print('Epoch: %d' % epoch)

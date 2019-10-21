@@ -2,15 +2,40 @@ import librosa
 import numpy as np
 import os
 import pyworld
+import multiprocessing
+import tqdm
+import traceback
+
+wav_dir_path = ''
+sample_rate = 0
+
+def laod_wav(wav_path):
+    global wav_dir_path
+    try:
+        file_path = os.path.join(wav_dir_path, wav_path)
+        wav, _ = librosa.load(file_path, sr=sample_rate, mono=True)
+    except:
+        print(traceback.format_exc())
+        # wav = wav.astype(np.float64)
+    return(wav)
+
 
 def load_wavs(wav_dir, sr):
 
-    wavs = list()
-    for file in os.listdir(wav_dir):
-        file_path = os.path.join(wav_dir, file)
-        wav, _ = librosa.load(file_path, sr = sr, mono = True)
-        #wav = wav.astype(np.float64)
-        wavs.append(wav)
+ 
+    global sample_rate,wav_dir_path
+
+    sample_rate=sr
+
+    wav_dir_path = wav_dir
+
+    pool = multiprocessing.Pool(4)
+
+    wav_files = [x for x in os.listdir(wav_dir) if x.endswith('.wav')]
+
+    wavs = list(tqdm.tqdm(pool.imap_unordered(laod_wav,wav_files)))
+
+    pool.close()
 
     return wavs
 
@@ -42,23 +67,43 @@ def world_decode_spectral_envelop(coded_sp, fs):
 
     return decoded_sp
 
+FS =0
+FRAME_PERIOD=0
+CODED_DIM  = 0
+
+def encode_wav(wav):
+    fs=FS
+    frame_period=FRAME_PERIOD
+    coded_dim=CODED_DIM
+
+    f0, timeaxis, sp, ap = world_decompose(wav=wav, fs=fs, frame_period=frame_period)
+    coded_sp = world_encode_spectral_envelop(sp=sp, fs=fs, dim=coded_dim)
+
+    return (f0,timeaxis,sp,ap,coded_sp)
+
+
 
 def world_encode_data(wavs, fs, frame_period = 5.0, coded_dim = 24):
+    global FS,FRAME_PERIOD,CODED_DIM
 
-    f0s = list()
-    timeaxes = list()
-    sps = list()
-    aps = list()
-    coded_sps = list()
+    f0s, timeaxes, sps, aps, coded_sps=list(),list(),list(),list(),list()
 
-    for wav in wavs:
-        f0, timeaxis, sp, ap = world_decompose(wav = wav, fs = fs, frame_period = frame_period)
-        coded_sp = world_encode_spectral_envelop(sp = sp, fs = fs, dim = coded_dim)
-        f0s.append(f0)
-        timeaxes.append(timeaxis)
-        sps.append(sp)
-        aps.append(ap)
-        coded_sps.append(coded_sp)
+    FS=fs
+    FRAME_PERIOD=frame_period
+    CODED_DIM=coded_dim
+
+    pool= multiprocessing.Pool(6)
+
+    results = list(tqdm.tqdm(map(encode_wav,wavs),total=len(wavs)))
+
+    pool.close()
+
+    for result in results:
+        f0s.append(result[0])
+        timeaxes.append(result[1])
+        sps.append(result[2])
+        aps.append(result[3])
+        coded_sps.append(result[4])
 
     return f0s, timeaxes, sps, aps, coded_sps
 

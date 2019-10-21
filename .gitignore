@@ -1,0 +1,17 @@
+
+*.npz
+
+
+*.wav
+
+*.xml
+
+*.pyc
+
+train_log/20191021-184843/
+
+model/
+
+*.DESKTOP-5OD8NSD
+
+*.ini
