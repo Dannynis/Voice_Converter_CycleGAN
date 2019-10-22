@@ -18,9 +18,9 @@ class CycleGAN(object):
         self.build_model()
         self.optimizer_initializer()
 
-        self.saver = tf.train.Saver()
-        self.sess = tf.Session()
-        self.sess.run(tf.global_variables_initializer())
+        # self.saver = tf.train.Saver()
+        # self.sess = tf.Session()
+        # self.sess.run(tf.global_variables_initializer())
 
         if self.mode == 'train':
             self.train_step = 0
@@ -31,15 +31,15 @@ class CycleGAN(object):
 
     def build_model(self):
 
-        # Placeholders for real training samples
-        self.input_A_real = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_A_real')
-        self.input_B_real = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_B_real')
-        # Placeholders for fake generated samples
-        self.input_A_fake = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_A_fake')
-        self.input_B_fake = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_B_fake')
-        # Placeholder for test samples
-        self.input_A_test = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_A_test')
-        self.input_B_test = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_B_test')
+        # # Placeholders for real training samples
+        # self.input_A_real = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_A_real')
+        # self.input_B_real = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_B_real')
+        # # Placeholders for fake generated samples
+        # self.input_A_fake = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_A_fake')
+        # self.input_B_fake = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_B_fake')
+        # # Placeholder for test samples
+        # self.input_A_test = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_A_test')
+        # self.input_B_test = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_B_test')
 
         self.generation_B = self.generator(inputs = self.input_A_real, reuse = False, scope_name = 'generator_A2B')
         self.cycle_A = self.generator(inputs = self.generation_B, reuse = False, scope_name = 'generator_B2A')
@@ -90,7 +90,7 @@ class CycleGAN(object):
         self.discriminator_loss = self.discriminator_loss_A + self.discriminator_loss_B
 
         # Categorize variables because we have to optimize the two sets of the variables separately
-        trainable_variables = tf.trainable_variables()
+        trainable_variables = tf.compat.v1.trainable_variables()
         self.discriminator_vars = [var for var in trainable_variables if 'discriminator' in var.name]
         self.generator_vars = [var for var in trainable_variables if 'generator' in var.name]
         #for var in t_vars: print(var.name)
@@ -109,20 +109,101 @@ class CycleGAN(object):
 
     def train(self, input_A, input_B, lambda_cycle, lambda_identity, generator_learning_rate, discriminator_learning_rate):
 
+        generation_A = self.generator(inputs=input_A, reuse=False, scope_name='generator_A2B')
+
+        generation_B = self.generator(inputs=input_B, reuse=False, scope_name='generator_A2B')
+
+        cycle_A = self.generator(inputs=generation_B, reuse=False, scope_name='generator_B2A')
+
+        cycle_B = self.generator(inputs = self.generation_A, reuse = True, scope_name = 'generator_A2B')
+
+        generation_A_identity = self.generator(inputs=input_A, reuse=True, scope_name='generator_B2A')
+
+        generation_B_identity = self.generator(inputs=input_B, reuse=True, scope_name='generator_A2B')
+
+        cycle_loss = l1_loss(y = input_A, y_hat = cycle_A) + l1_loss(y = input_B, y_hat = cycle_B)
+
+        # Identity loss
+        identity_loss = l1_loss(y = input_A, y_hat = generation_A_identity) + l1_loss(y = input_B, y_hat = generation_B_identity)
+
+        discrimination_A_fake = self.discriminator(inputs=generation_A, reuse=False,
+                                                        scope_name='discriminator_A')
+        discrimination_B_fake = self.discriminator(inputs=generation_B, reuse=False,
+                                                        scope_name='discriminator_B')
+
+
+        # Generator loss
+        # Generator wants to fool discriminator
+        generator_loss_A2B = l2_loss(y=tf.keras.ones_like(discrimination_B_fake), y_hat=discrimination_B_fake)
+        generator_loss_B2A = l2_loss(y=tf.keras.ones_like(discrimination_A_fake), y_hat=discrimination_A_fake)
+
+
+        # Merge the two generators and the cycle loss
+        generator_loss = generator_loss_A2B + generator_loss_B2A + lambda_cycle * cycle_loss + lambda_identity * identity_loss
+
+
+        self.generator_optimizer = tf.train.AdamOptimizer(learning_rate = self.generator_learning_rate, beta1 = 0.5).minimize(generator_loss, var_list =self.generator.trainable_variables)
+
+
+
+
+        ############################################################################################################################
+
+        # Discriminator loss
+        discrimination_input_A_real = self.discriminator(inputs=input_A, reuse=True,
+                                                              scope_name='discriminator_A')
+        discrimination_input_B_real = self.discriminator(inputs=input_B, reuse=True,
+                                                              scope_name='discriminator_B')
+        discrimination_input_A_fake = self.discriminator(inputs=generation_A, reuse=True,
+                                                              scope_name='discriminator_A')
+        discrimination_input_B_fake = self.discriminator(inputs=generation_B, reuse=True,
+                                                              scope_name='discriminator_B')
+
+        # Discriminator wants to classify real and fake correctly
+        discriminator_loss_input_A_real = l2_loss(y=tf.keras.ones_like(discrimination_input_A_real),
+                                                       y_hat=discrimination_input_A_real)
+        discriminator_loss_input_A_fake = l2_loss(y=tf.keras.zeros_like(discrimination_input_A_fake),
+                                                       y_hat=discrimination_input_A_fake)
+        discriminator_loss_A = (discriminator_loss_input_A_real + discriminator_loss_input_A_fake) / 2
+
+        discriminator_loss_input_B_real = l2_loss(y=tf.keras.ones_like(discrimination_input_B_real),
+                                                       y_hat=discrimination_input_B_real)
+        discriminator_loss_input_B_fake = l2_loss(y=tf.keras.zeros_like(discrimination_input_B_fake),
+                                                       y_hat=discrimination_input_B_fake)
+        discriminator_loss_B = (discriminator_loss_input_B_real + discriminator_loss_input_B_fake) / 2
+
+        # Merge the two discriminators into one
+        discriminator_loss = discriminator_loss_A + discriminator_loss_B
+
+
+        generator_summaries, discriminator_summaries = self.summary()
+
+        self.writer.add_summary(discriminator_summaries, self.train_step)
+
+        self.writer.add_summary(generator_summaries, self.train_step)
+
+        self.train_step += 1
+
+
+
+
+
+        return generator_loss, discriminator_loss
+
+
+
+
+
+
         generation_A, generation_B, generator_loss, _, generator_summaries = self.sess.run(
             [self.generation_A, self.generation_B, self.generator_loss, self.generator_optimizer, self.generator_summaries], \
             feed_dict = {self.lambda_cycle: lambda_cycle, self.lambda_identity: lambda_identity, self.input_A_real: input_A, self.input_B_real: input_B, self.generator_learning_rate: generator_learning_rate})
 
-        self.writer.add_summary(generator_summaries, self.train_step)
 
         discriminator_loss, _, discriminator_summaries = self.sess.run([self.discriminator_loss, self.discriminator_optimizer, self.discriminator_summaries], \
             feed_dict = {self.input_A_real: input_A, self.input_B_real: input_B, self.discriminator_learning_rate: discriminator_learning_rate, self.input_A_fake: generation_A, self.input_B_fake: generation_B})
 
-        self.writer.add_summary(discriminator_summaries, self.train_step)
 
-        self.train_step += 1
-
-        return generator_loss, discriminator_loss
 
 
     def test(self, inputs, direction):
@@ -152,19 +233,19 @@ class CycleGAN(object):
 
     def summary(self):
 
-        with tf.name_scope('generator_summaries'):
+        with tf.compat.v1.name_scope('generator_summaries'):
             cycle_loss_summary = tf.summary.scalar('cycle_loss', self.cycle_loss)
             identity_loss_summary = tf.summary.scalar('identity_loss', self.identity_loss)
             generator_loss_A2B_summary = tf.summary.scalar('generator_loss_A2B', self.generator_loss_A2B)
             generator_loss_B2A_summary = tf.summary.scalar('generator_loss_B2A', self.generator_loss_B2A)
             generator_loss_summary = tf.summary.scalar('generator_loss', self.generator_loss)
-            generator_summaries = tf.summary.merge([cycle_loss_summary, identity_loss_summary, generator_loss_A2B_summary, generator_loss_B2A_summary, generator_loss_summary])
+            generator_summaries = tf.compat.v1.summary.merge([cycle_loss_summary, identity_loss_summary, generator_loss_A2B_summary, generator_loss_B2A_summary, generator_loss_summary])
 
-        with tf.name_scope('discriminator_summaries'):
+        with tf.compat.v1.name_scope('discriminator_summaries'):
             discriminator_loss_A_summary = tf.summary.scalar('discriminator_loss_A', self.discriminator_loss_A)
             discriminator_loss_B_summary = tf.summary.scalar('discriminator_loss_B', self.discriminator_loss_B)
             discriminator_loss_summary = tf.summary.scalar('discriminator_loss', self.discriminator_loss)
-            discriminator_summaries = tf.summary.merge([discriminator_loss_A_summary, discriminator_loss_B_summary, discriminator_loss_summary])
+            discriminator_summaries = tf.compat.v1.summary.merge([discriminator_loss_A_summary, discriminator_loss_B_summary, discriminator_loss_summary])
 
         return generator_summaries, discriminator_summaries
 
