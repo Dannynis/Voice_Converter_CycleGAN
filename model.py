@@ -1,6 +1,6 @@
 import os
 import tensorflow as tf
-from module import discriminator, generator_gatedcnn
+from module import Discriminator, Generator
 from utils import l1_loss, l2_loss, cross_entropy_loss
 from datetime import datetime
 
@@ -11,8 +11,7 @@ class CycleGAN(object):
         self.num_features = num_features
         self.input_shape = [None, num_features, None] # [batch_size, num_features, num_frames]
 
-        self.discriminator = discriminator
-        self.generator = generator
+
         self.mode = mode
 
         self.build_model()
@@ -40,7 +39,10 @@ class CycleGAN(object):
         # # Placeholder for test samples
         # self.input_A_test = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_A_test')
         # self.input_B_test = tf.placeholder(tf.float32, shape = self.input_shape, name = 'input_B_test')
+        self.generation_A2B = Generator()
+        self.generation_B2A = Generator()
 
+        self.
         self.generation_B = self.generator(inputs = self.input_A_real, reuse = False, scope_name = 'generator_A2B')
         self.cycle_A = self.generator(inputs = self.generation_B, reuse = False, scope_name = 'generator_B2A')
 
