@@ -42,6 +42,7 @@ class conv2d_layer(Model):
     activation = None,
     kernel_initializer = None,
     name = None):
+        super(conv2d_layer).__init__()
         self.conv_2d_layer = layers.Conv2D(
             filters=filters,
             kernel_size=kernel_size,
@@ -59,6 +60,7 @@ class residual1d_block(Model):
     def __init__(self,filters = 1024,
     kernel_size = 3,
     strides = 1,name_prefix = 'residule_block_'):
+        super(residual1d_block).__init__()
         self.h1 = conv1d_layer( filters = filters, kernel_size = kernel_size, strides = strides, activation = None, name = name_prefix + 'h1_conv')
         self.h1_norm = instance_norm_layer( name = name_prefix + 'h1_norm')
         self.h1_gates =  conv1d_layer( filters = filters, kernel_size = kernel_size, strides = strides, activation = None, name = name_prefix + 'h1_gates')
@@ -84,6 +86,7 @@ class downsample1d_block(Model):
     kernel_size,
     strides,
     name_prefix = 'downsample1d_block_'):
+        super(downsample1d_block).__init__()
         self.h1 = conv1d_layer(filters=filters, kernel_size=kernel_size, strides=strides, activation=None,
                                name=name_prefix + 'h1_conv')
         self.h1_norm = instance_norm_layer(name=name_prefix + 'h1_norm')
@@ -104,6 +107,7 @@ class downsample2d_block(Model):
                  kernel_size,
                  strides,
                  name_prefix='downsample1d_block_'):
+        super(downsample2d_block).__init__()
         self.h1 = conv2d_layer(filters=filters, kernel_size=kernel_size, strides=strides, activation=None,
                                name=name_prefix + 'h1_conv')
         self.h1_norm = instance_norm_layer(name=name_prefix + 'h1_norm')
@@ -120,13 +124,13 @@ class downsample2d_block(Model):
         return h1_glu
 
 class upsample1d_block(Model):
-
     def __init__(self,inputs,
     filters,
     kernel_size,
     strides,
     shuffle_size = 2,
     name_prefix = 'upsample1d_block_'):
+        super(upsample1d_block).__init__()
         self.h1 = conv1d_layer(filters=filters, kernel_size=kernel_size, strides=strides, activation=None,
                           name=name_prefix + 'h1_conv')
         self.h1_norm = instance_norm_layer( name=name_prefix + 'h1_norm')
@@ -167,6 +171,7 @@ def pixel_shuffler(inputs, shuffle_size = 2, name = None):
 class Generator(Model):
 
     def __init__(self):
+        super(Generator).__init__()
         self.h1 = conv1d_layer(filters=128, kernel_size=15, strides=1, activation=None, name='h1_conv')
         self.h1_gates = conv1d_layer(filters=128, kernel_size=15, strides=1, activation=None, name='h1_conv_gates')
 
@@ -219,7 +224,7 @@ class Generator(Model):
 class Discriminator(Model):
 
     def __int__(self,x):
-
+        super(Discriminator).__init__()
         self.h1 = conv2d_layer( filters = 128, kernel_size = [3, 3], strides = [1, 2], activation = None, name = 'h1_conv')
         self.h1_gates = conv2d_layer(filters = 128, kernel_size = [3, 3], strides = [1, 2], activation = None, name = 'h1_conv_gates')
 

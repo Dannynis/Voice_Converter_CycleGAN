@@ -3,6 +3,7 @@ import numpy as np
 import argparse
 import time
 import librosa
+import tensorflow as tf
 
 from preprocess import *
 from model import CycleGAN
@@ -130,7 +131,28 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
             start = i * mini_batch_size
             end = (i + 1) * mini_batch_size
 
-            generator_loss, discriminator_loss = model.train(input_A = dataset_A[start:end], input_B = dataset_B[start:end], lambda_cycle = lambda_cycle, lambda_identity = lambda_identity, generator_learning_rate = generator_learning_rate, discriminator_learning_rate = discriminator_learning_rate)
+            optimizer_generator = tf.optimizers.Adam(generator_learning_rate)
+            optimizer_discriminator = tf.optimizers.Adam(discriminator_learning_rate)
+
+            # Wrap computation inside a GradientTape for automatic differentiation.
+            with tf.GradientTape() as g:
+
+                generator_loss, discriminator_loss = model.train(input_A = dataset_A[start:end], input_B = dataset_B[start:end], lambda_cycle = lambda_cycle,lambda_identity = lambda_identity)
+
+
+                generator_trainable_variables = tf.concat (model.generator_A2B.trainable_variables,model.generator_B2A.trainable_variables)
+                discriminator_trainable_variables = tf.concat (model.discriminator_A.trainable_variables,model.discriminator_B.trainable_variables)
+
+                # Compute gradients.
+                generator_gradients = g.gradient(generator_loss, generator_trainable_variables)
+                discriminator_gradients = g.gradient(discriminator_loss, discriminator_trainable_variables)
+
+
+                # Update W and b following gradients.
+                optimizer_generator.apply_gradients(zip(generator_gradients, generator_trainable_variables))
+                optimizer_generator.apply_gradients(zip(discriminator_gradients, discriminator_trainable_variables))
+
+
 
             if i % 50 == 0:
                 #print('Iteration: %d, Generator Loss : %f, Discriminator Loss : %f' % (num_iterations, generator_loss, discriminator_loss))
@@ -187,8 +209,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description = 'Train CycleGAN model for datasets.')
 
-    train_A_dir_default = './data/vcc2016_training/SF1'
-    train_B_dir_default = './data/vcc2016_training/TF2'
+    train_A_dir_default = r"D:\ml+dl+dsp\Voice_Converter_CycleGAN\train\trump"
+    train_B_dir_default = r"D:\ml+dl+dsp\Voice_Converter_CycleGAN\train\gaga"
     model_dir_default = './model/sf1_tf2'
     model_name_default = 'sf1_tf2.ckpt'
     random_seed_default = 0
