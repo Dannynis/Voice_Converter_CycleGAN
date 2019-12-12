@@ -12,7 +12,7 @@ def gated_linear_layer(inputs, gates, name = None):
 
 class instance_norm_layer(Model):
     def __init__(self,name,epsilon = 1e-06):
-        super(instance_norm_layer).__init__()
+        super(instance_norm_layer,self).__init__()
         self.instance_norm = tensorflow_addons.layers.normalizations.InstanceNormalization(epsilon=epsilon,name=name)
 
     def call(self,x):
@@ -20,7 +20,9 @@ class instance_norm_layer(Model):
 
 class conv1d_layer(Model):
     def __init__(self,filters,kernel_size,strides = 1,padding = 'same',activation = None,kernel_initializer = None,name = None):
-        super(conv1d_layer).__init__()
+        super(conv1d_layer,self).__init__()
+        self.filters, self.kernel_size,self.strides,self.padding,self.activation,self.kernel_initializer=\
+        filters,kernel_size,strides,padding,activation,kernel_initializer
         self.conv_1d_layer = layers.Conv1D(
             filters=filters,
             kernel_size=kernel_size,
@@ -31,8 +33,10 @@ class conv1d_layer(Model):
             name=name)
 
     def call(self,x):
-        return self.conv_1d_layer(x)
-
+        # print ('conv1d pass x with shape {} using filters {} kernel size {} stride {}'.format(x.shape,self.filters,self.kernel_size,self.strides))
+        result =  self.conv_1d_layer(x)
+        # print ('resulted shape {}'.format(result.shape))
+        return result
 
 class conv2d_layer(Model):
     def __init__(self,filters,
@@ -42,7 +46,7 @@ class conv2d_layer(Model):
     activation = None,
     kernel_initializer = None,
     name = None):
-        super(conv2d_layer).__init__()
+        super(conv2d_layer,self).__init__()
         self.conv_2d_layer = layers.Conv2D(
             filters=filters,
             kernel_size=kernel_size,
@@ -60,7 +64,7 @@ class residual1d_block(Model):
     def __init__(self,filters = 1024,
     kernel_size = 3,
     strides = 1,name_prefix = 'residule_block_'):
-        super(residual1d_block).__init__()
+        super(residual1d_block,self).__init__()
         self.h1 = conv1d_layer( filters = filters, kernel_size = kernel_size, strides = strides, activation = None, name = name_prefix + 'h1_conv')
         self.h1_norm = instance_norm_layer( name = name_prefix + 'h1_norm')
         self.h1_gates =  conv1d_layer( filters = filters, kernel_size = kernel_size, strides = strides, activation = None, name = name_prefix + 'h1_gates')
@@ -72,11 +76,11 @@ class residual1d_block(Model):
     def call(self,x):
         h1 = self.h1(x)
         h1_norm = self.h1_norm(h1)
-        h1_gates = self.h1_gates(h1_norm)
+        h1_gates = self.h1_gates(x)
         h1_norm_gates = self.h1_norm_gates(h1_gates)
         h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates, name=self.name_prefix + 'h1_glu')
         h2 = self.h2(h1_glu)
-        h2_norm = instance_norm_layer(inputs=h2, activation_fn=None, name=self.name_prefix + 'h2_norm')
+        h2_norm = self.h2_norm(h2)
         h3 = x + h2_norm
         return h3
 
@@ -86,18 +90,19 @@ class downsample1d_block(Model):
     kernel_size,
     strides,
     name_prefix = 'downsample1d_block_'):
-        super(downsample1d_block).__init__()
+        super(downsample1d_block,self).__init__()
         self.h1 = conv1d_layer(filters=filters, kernel_size=kernel_size, strides=strides, activation=None,
                                name=name_prefix + 'h1_conv')
         self.h1_norm = instance_norm_layer(name=name_prefix + 'h1_norm')
         self.h1_gates = conv1d_layer(filters=filters, kernel_size=kernel_size, strides=strides, activation=None,
                                      name=name_prefix + 'h1_gates')
         self.h1_norm_gates = instance_norm_layer(name=name_prefix + 'h1_norm_gates')
+        self.name_prefix = name_prefix
 
     def call(self,x):
         h1 = self.h1(x)
         h1_norm = self.h1_norm(h1)
-        h1_gates = self.h1_gates(h1_norm)
+        h1_gates = self.h1_gates(x)
         h1_norm_gates = self.h1_norm_gates(h1_gates)
         h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates, name=self.name_prefix + 'h1_glu')
         return h1_glu
@@ -107,30 +112,31 @@ class downsample2d_block(Model):
                  kernel_size,
                  strides,
                  name_prefix='downsample1d_block_'):
-        super(downsample2d_block).__init__()
+        super(downsample2d_block,self).__init__()
         self.h1 = conv2d_layer(filters=filters, kernel_size=kernel_size, strides=strides, activation=None,
                                name=name_prefix + 'h1_conv')
         self.h1_norm = instance_norm_layer(name=name_prefix + 'h1_norm')
         self.h1_gates = conv2d_layer(filters=filters, kernel_size=kernel_size, strides=strides, activation=None,
                                      name=name_prefix + 'h1_gates')
         self.h1_norm_gates = instance_norm_layer(name=name_prefix + 'h1_norm_gates')
+        self.name_prefix = name_prefix
 
     def call(self, x):
         h1 = self.h1(x)
         h1_norm = self.h1_norm(h1)
-        h1_gates = self.h1_gates(h1_norm)
+        h1_gates = self.h1_gates(x)
         h1_norm_gates = self.h1_norm_gates(h1_gates)
         h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates, name=self.name_prefix + 'h1_glu')
         return h1_glu
 
 class upsample1d_block(Model):
-    def __init__(self,inputs,
+    def __init__(self,
     filters,
     kernel_size,
     strides,
     shuffle_size = 2,
     name_prefix = 'upsample1d_block_'):
-        super(upsample1d_block).__init__()
+        super(upsample1d_block,self).__init__()
         self.h1 = conv1d_layer(filters=filters, kernel_size=kernel_size, strides=strides, activation=None,
                           name=name_prefix + 'h1_conv')
         self.h1_norm = instance_norm_layer( name=name_prefix + 'h1_norm')
@@ -139,8 +145,6 @@ class upsample1d_block(Model):
 
         self.h1_gates = conv1d_layer( filters=filters, kernel_size=kernel_size, strides=strides,
                                 activation=None, name=name_prefix + 'h1_gates')
-        self.h1_shuffle_gates = pixel_shuffler(shuffle_size=shuffle_size,
-                                          name=name_prefix + 'h1_shuffle_gates')
         self.h1_norm_gates = instance_norm_layer( name=name_prefix + 'h1_norm_gates')
 
 
@@ -148,7 +152,7 @@ class upsample1d_block(Model):
         h1 = self.h1(x)
         h1_shuffle = pixel_shuffler(h1,name=self.name_prefix + 'h1_shuffle',shuffle_size=self.shuffle_size)
         h1_norm = self.h1_norm(h1_shuffle)
-        h1_gates =self.h1_gates(h1_norm)
+        h1_gates =self.h1_gates(x)
         h1_shuffle_gates = pixel_shuffler(h1_gates,name = self.name_prefix + 'h1_shuffle_gates',shuffle_size = self.shuffle_size)
         h1_norm_gates = self.h1_norm_gates(h1_shuffle_gates)
         h1_glu = gated_linear_layer(inputs = h1_norm,gates=h1_norm_gates)
@@ -171,7 +175,7 @@ def pixel_shuffler(inputs, shuffle_size = 2, name = None):
 class Generator(Model):
 
     def __init__(self):
-        super(Generator).__init__()
+        super(Generator,self).__init__()
         self.h1 = conv1d_layer(filters=128, kernel_size=15, strides=1, activation=None, name='h1_conv')
         self.h1_gates = conv1d_layer(filters=128, kernel_size=15, strides=1, activation=None, name='h1_conv_gates')
 
@@ -200,10 +204,10 @@ class Generator(Model):
     def call(self,x):
         # inputs has shape [batch_size, num_features, time]
         # we need to convert it to [batch_size, time, num_features] for 1D convolution
-        inputs = tf.keras.transpose(x, perm = [0, 2, 1], name = 'input_transpose')
+        inputs = tf.transpose(x, perm = [0, 2, 1], name = 'input_transpose')
 
         h1 = self.h1(inputs)
-        h1_gates = self.h1_gates(h1)
+        h1_gates = self.h1_gates(inputs)
         h1_glu = gated_linear_layer(inputs=h1, gates = h1_gates, name = 'h1_glu')
 
         d1= self.d1(h1_glu)
@@ -223,8 +227,8 @@ class Generator(Model):
 
 class Discriminator(Model):
 
-    def __int__(self,x):
-        super(Discriminator).__init__()
+    def __init__(self):
+        super(Discriminator,self).__init__()
         self.h1 = conv2d_layer( filters = 128, kernel_size = [3, 3], strides = [1, 2], activation = None, name = 'h1_conv')
         self.h1_gates = conv2d_layer(filters = 128, kernel_size = [3, 3], strides = [1, 2], activation = None, name = 'h1_conv_gates')
 
@@ -241,7 +245,7 @@ class Discriminator(Model):
         # we need to add channel for 2D convolution [batch_size, num_features, time, 1]
         inputs = tf.expand_dims(x, -1)
         h1 = self.h1(inputs)
-        h1_gates = self.h1_gates(h1)
+        h1_gates = self.h1_gates(inputs)
         h1_glu = gated_linear_layer(inputs=h1,gates = h1_gates,name= 'h1_glu')
         d1 = self.d1(h1_glu)
         d2 = self.d2(d1)

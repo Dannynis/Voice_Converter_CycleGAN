@@ -23,6 +23,10 @@ def load_speaker_features(file_path):
 
 def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validation_A_dir, validation_B_dir, output_dir, tensorboard_log_dir):
 
+   # tf.keras.backend.set_floatx('float64')
+
+    print ('USING TF {}'.format(tf.version.VERSION))
+
     np.random.seed(random_seed)
 
     num_epochs = 5000
@@ -134,23 +138,12 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
             optimizer_generator = tf.optimizers.Adam(generator_learning_rate)
             optimizer_discriminator = tf.optimizers.Adam(discriminator_learning_rate)
 
-            # Wrap computation inside a GradientTape for automatic differentiation.
-            with tf.GradientTape() as g:
 
-                generator_loss, discriminator_loss = model.train(input_A = dataset_A[start:end], input_B = dataset_B[start:end], lambda_cycle = lambda_cycle,lambda_identity = lambda_identity)
-
-
-                generator_trainable_variables = tf.concat (model.generator_A2B.trainable_variables,model.generator_B2A.trainable_variables)
-                discriminator_trainable_variables = tf.concat (model.discriminator_A.trainable_variables,model.discriminator_B.trainable_variables)
-
-                # Compute gradients.
-                generator_gradients = g.gradient(generator_loss, generator_trainable_variables)
-                discriminator_gradients = g.gradient(discriminator_loss, discriminator_trainable_variables)
+            generator_loss, discriminator_loss = model.fit(input_A =dataset_A[start:end], input_B =dataset_B[start:end],
+                                                           lambda_cycle = lambda_cycle, lambda_identity = lambda_identity, optimizer_discriminator=optimizer_discriminator
+                                                           , optimizer_generator=optimizer_generator)
 
 
-                # Update W and b following gradients.
-                optimizer_generator.apply_gradients(zip(generator_gradients, generator_trainable_variables))
-                optimizer_generator.apply_gradients(zip(discriminator_gradients, discriminator_trainable_variables))
 
 
 
@@ -158,7 +151,7 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
                 #print('Iteration: %d, Generator Loss : %f, Discriminator Loss : %f' % (num_iterations, generator_loss, discriminator_loss))
                 print('Iteration: {:07d}, Generator Learning Rate: {:.7f}, Discriminator Learning Rate: {:.7f}, Generator Loss : {:.3f}, Discriminator Loss : {:.3f}'.format(num_iterations, generator_learning_rate, discriminator_learning_rate, generator_loss, discriminator_loss))
 
-        model.save(directory = model_dir, filename = model_name)
+        model.save_model(directory = model_dir, filename = model_name)
 
         end_time_epoch = time.time()
         time_elapsed_epoch = end_time_epoch - start_time_epoch
@@ -175,12 +168,12 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
                     f0, timeaxis, sp, ap = world_decompose(wav = wav, fs = sampling_rate, frame_period = frame_period)
                     f0_converted = pitch_conversion(f0 = f0, mean_log_src = log_f0s_mean_A, std_log_src = log_f0s_std_A, mean_log_target = log_f0s_mean_B, std_log_target = log_f0s_std_B)
                     coded_sp = world_encode_spectral_envelop(sp = sp, fs = sampling_rate, dim = num_mcep)
-                    coded_sp_transposed = coded_sp.T
+                    coded_sp_transposed = tf.transpose(coded_sp)
                     coded_sp_norm = (coded_sp_transposed - coded_sps_A_mean) / coded_sps_A_std
                     coded_sp_converted_norm = model.test(inputs = np.array([coded_sp_norm]), direction = 'A2B')[0]
                     coded_sp_converted = coded_sp_converted_norm * coded_sps_B_std + coded_sps_B_mean
-                    coded_sp_converted = coded_sp_converted.T
-                    coded_sp_converted = np.ascontiguousarray(coded_sp_converted)
+                    coded_sp_converted = tf.transpose(coded_sp_converted)
+                    coded_sp_converted = np.ascontiguousarray(coded_sp_converted,dtype="double")
                     decoded_sp_converted = world_decode_spectral_envelop(coded_sp = coded_sp_converted, fs = sampling_rate)
                     wav_transformed = world_speech_synthesis(f0 = f0_converted, decoded_sp = decoded_sp_converted, ap = ap, fs = sampling_rate, frame_period = frame_period)
                     librosa.output.write_wav(os.path.join(validation_A_output_dir, os.path.basename(file)), wav_transformed, sampling_rate)
@@ -195,12 +188,12 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
                     f0, timeaxis, sp, ap = world_decompose(wav = wav, fs = sampling_rate, frame_period = frame_period)
                     f0_converted = pitch_conversion(f0 = f0, mean_log_src = log_f0s_mean_B, std_log_src = log_f0s_std_B, mean_log_target = log_f0s_mean_A, std_log_target = log_f0s_std_A)
                     coded_sp = world_encode_spectral_envelop(sp = sp, fs = sampling_rate, dim = num_mcep)
-                    coded_sp_transposed = coded_sp.T
+                    coded_sp_transposed = tf.transpose(coded_sp)
                     coded_sp_norm = (coded_sp_transposed - coded_sps_B_mean) / coded_sps_B_std
                     coded_sp_converted_norm = model.test(inputs = np.array([coded_sp_norm]), direction = 'B2A')[0]
                     coded_sp_converted = coded_sp_converted_norm * coded_sps_A_std + coded_sps_A_mean
-                    coded_sp_converted = coded_sp_converted.T
-                    coded_sp_converted = np.ascontiguousarray(coded_sp_converted)
+                    coded_sp_converted = tf.transpose(coded_sp_converted)
+                    coded_sp_converted = np.ascontiguousarray(coded_sp_converted,dtype="double")
                     decoded_sp_converted = world_decode_spectral_envelop(coded_sp = coded_sp_converted, fs = sampling_rate)
                     wav_transformed = world_speech_synthesis(f0 = f0_converted, decoded_sp = decoded_sp_converted, ap = ap, fs = sampling_rate, frame_period = frame_period)
                     librosa.output.write_wav(os.path.join(validation_B_output_dir, os.path.basename(file)), wav_transformed, sampling_rate)
@@ -209,13 +202,13 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description = 'Train CycleGAN model for datasets.')
 
-    train_A_dir_default = r"D:\ml+dl+dsp\Voice_Converter_CycleGAN\train\trump"
-    train_B_dir_default = r"D:\ml+dl+dsp\Voice_Converter_CycleGAN\train\gaga"
+    train_A_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/gaga"
+    train_B_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/trump"
     model_dir_default = './model/sf1_tf2'
     model_name_default = 'sf1_tf2.ckpt'
     random_seed_default = 0
-    validation_A_dir_default = './data/evaluation_all/SF1'
-    validation_B_dir_default = './data/evaluation_all/TF2'
+    validation_A_dir_default = train_A_dir_default
+    validation_B_dir_default = train_B_dir_default
     output_dir_default = './validation_output'
     tensorboard_log_dir_default = './log'
 
