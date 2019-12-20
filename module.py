@@ -174,7 +174,7 @@ def pixel_shuffler(inputs, shuffle_size = 2, name = None):
 
 class Generator(Model):
 
-    def __init__(self):
+    def __init__(self,num_features):
         super(Generator,self).__init__()
         self.h1 = conv1d_layer(filters=128, kernel_size=15, strides=1, activation=None, name='h1_conv')
         self.h1_gates = conv1d_layer(filters=128, kernel_size=15, strides=1, activation=None, name='h1_conv_gates')
@@ -199,8 +199,8 @@ class Generator(Model):
                               name_prefix='upsample1d_block2_')
 
         # Output
-        self.o1 = conv1d_layer(filters=24, kernel_size=15, strides=1, activation=None, name='o1_conv')
-
+        self.o1 = conv1d_layer(filters=num_features, kernel_size=15, strides=1, activation=None, name='o1_conv')
+    @tf.function
     def call(self,x):
         # inputs has shape [batch_size, num_features, time]
         # we need to convert it to [batch_size, time, num_features] for 1D convolution
@@ -240,6 +240,7 @@ class Discriminator(Model):
         # Output
         self.o1 = layers.Dense(units = 1, activation = tf.nn.sigmoid)
 
+    @tf.function
     def call(self,x):
         # inputs has shape [batch_size, num_features, time]
         # we need to add channel for 2D convolution [batch_size, num_features, time, 1]

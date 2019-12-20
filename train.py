@@ -11,7 +11,7 @@ from model import CycleGAN
 processed_data_dir = './processed_data'
 
 
-def load_speaker_features(file_path):
+def load_speaker_features(file_path,cutoff=None):
 
     mcep_params = np.load(file_path, allow_pickle=True)
     f0s = mcep_params['f0s']
@@ -19,7 +19,10 @@ def load_speaker_features(file_path):
     sps = mcep_params['sps']
     aps = mcep_params['aps']
     coded_sps = mcep_params['coded_sps']
-    return f0s,timeaxes,sps,aps,coded_sps
+    if cutoff != None:
+        return f0s,timeaxes,sps,aps,coded_sps
+    else:
+        return f0s[:cutoff],timeaxes[:cutoff],sps[:cutoff],aps[:cutoff],coded_sps[:cutoff]
 
 def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validation_A_dir, validation_B_dir, output_dir, tensorboard_log_dir):
 
@@ -36,7 +39,7 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
     discriminator_learning_rate = 0.000001
     discriminator_learning_rate_decay = discriminator_learning_rate / 200000
     sampling_rate = 16000
-    num_mcep = 24
+    num_mcep = 64
     frame_period = 5.0
     n_frames = 64
     lambda_cycle = 10
@@ -124,7 +127,7 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
 
         for i in range(n_samples // mini_batch_size):
 
-            num_iterations = n_samples // mini_batch_size * epoch + i
+            num_iterations = n_samples // mini_batch_size * epoch + i                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
 
             if num_iterations > 10000:
                 lambda_identity = 0
@@ -202,8 +205,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description = 'Train CycleGAN model for datasets.')
 
-    train_A_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/gaga"
-    train_B_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/trump"
+    train_A_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/super_short_trump"
+    train_B_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/super_short_trump"
     model_dir_default = './model/sf1_tf2'
     model_name_default = 'sf1_tf2.ckpt'
     random_seed_default = 0

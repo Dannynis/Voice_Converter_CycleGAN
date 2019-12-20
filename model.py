@@ -15,7 +15,7 @@ class CycleGAN:
 
         self.mode = mode
 
-        self.build_model()
+        self.build_model(num_features)
 
         # self.saver = tf.train.Saver()
         # self.sess = tf.Session()
@@ -37,11 +37,11 @@ class CycleGAN:
         self.inputs_setup=True
 
 
-    def build_model(self):
+    def build_model(self,num_features):
 
 
-        self.generator_A2B = Generator()
-        self.generator_B2A = Generator()
+        self.generator_A2B = Generator(num_features)
+        self.generator_B2A = Generator(num_features)
 
         self.discriminator_A = Discriminator()
         self.discriminator_B = Discriminator()
@@ -58,6 +58,8 @@ class CycleGAN:
             generation_A = self.generator_A2B(inputs=input_A)
 
             generation_B = self.generator_B2A(inputs=input_B)
+
+            print ('inputing {}'.format(generation_B.shape))
 
             cycle_A = self.generator_B2A(inputs=generation_B)
 
