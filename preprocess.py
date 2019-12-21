@@ -56,11 +56,13 @@ def world_encode_spectral_envelop(sp, fs, dim = 24):
     #sp = sp.astype(np.float64)
     coded_sp = pyworld.code_spectral_envelope(sp, fs, dim)
     coded_sp = coded_sp.astype(np.float32)
+    librosa.amplitude_to_db(coded_sp, np.max, top_db=99)
 
     return coded_sp
 
 def world_decode_spectral_envelop(coded_sp, fs):
 
+    coded_sp = librosa.db_to_amplitude(coded_sp)
     fftlen = pyworld.get_cheaptrick_fft_size(fs)
     coded_sp = coded_sp.astype(np.float64)
     #coded_sp = np.ascontiguousarray(coded_sp)

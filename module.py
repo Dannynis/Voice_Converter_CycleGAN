@@ -2,10 +2,9 @@ import tensorflow as tf
 from tensorflow.keras import Model, layers
 import tensorflow_addons
 
+def gated_linear_layer(inputs, gates):
 
-def gated_linear_layer(inputs, gates, name = None):
-
-    activation = tf.multiply(x = inputs, y = tf.sigmoid(gates), name = name)
+    activation = tf.multiply(x = inputs, y = tf.sigmoid(gates))
 
     return activation
 
@@ -78,7 +77,7 @@ class residual1d_block(Model):
         h1_norm = self.h1_norm(h1)
         h1_gates = self.h1_gates(x)
         h1_norm_gates = self.h1_norm_gates(h1_gates)
-        h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates, name=self.name_prefix + 'h1_glu')
+        h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates)
         h2 = self.h2(h1_glu)
         h2_norm = self.h2_norm(h2)
         h3 = x + h2_norm
@@ -104,7 +103,7 @@ class downsample1d_block(Model):
         h1_norm = self.h1_norm(h1)
         h1_gates = self.h1_gates(x)
         h1_norm_gates = self.h1_norm_gates(h1_gates)
-        h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates, name=self.name_prefix + 'h1_glu')
+        h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates)
         return h1_glu
 
 class downsample2d_block(Model):
@@ -126,7 +125,7 @@ class downsample2d_block(Model):
         h1_norm = self.h1_norm(h1)
         h1_gates = self.h1_gates(x)
         h1_norm_gates = self.h1_norm_gates(h1_gates)
-        h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates, name=self.name_prefix + 'h1_glu')
+        h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates)
         return h1_glu
 
 class upsample1d_block(Model):
@@ -150,16 +149,16 @@ class upsample1d_block(Model):
 
     def call(self,x):
         h1 = self.h1(x)
-        h1_shuffle = pixel_shuffler(h1,name=self.name_prefix + 'h1_shuffle',shuffle_size=self.shuffle_size)
+        h1_shuffle = pixel_shuffler(h1, shuffle_size=self.shuffle_size)
         h1_norm = self.h1_norm(h1_shuffle)
         h1_gates =self.h1_gates(x)
-        h1_shuffle_gates = pixel_shuffler(h1_gates,name = self.name_prefix + 'h1_shuffle_gates',shuffle_size = self.shuffle_size)
+        h1_shuffle_gates = pixel_shuffler(h1_gates, shuffle_size=self.shuffle_size)
         h1_norm_gates = self.h1_norm_gates(h1_shuffle_gates)
-        h1_glu = gated_linear_layer(inputs = h1_norm,gates=h1_norm_gates)
+        h1_glu = gated_linear_layer(inputs=h1_norm, gates=h1_norm_gates)
         return h1_glu
 
 
-def pixel_shuffler(inputs, shuffle_size = 2, name = None):
+def pixel_shuffler(inputs, shuffle_size=2):
 
     n = tf.shape(inputs)[0]
     w = tf.shape(inputs)[1]
@@ -168,7 +167,7 @@ def pixel_shuffler(inputs, shuffle_size = 2, name = None):
     oc = c // shuffle_size
     ow = w * shuffle_size
 
-    outputs = tf.reshape(tensor = inputs, shape = [n, ow, oc], name = name)
+    outputs = tf.reshape(tensor = inputs, shape = [n, ow, oc])
 
     return outputs
 
@@ -208,7 +207,7 @@ class Generator(Model):
 
         h1 = self.h1(inputs)
         h1_gates = self.h1_gates(inputs)
-        h1_glu = gated_linear_layer(inputs=h1, gates = h1_gates, name = 'h1_glu')
+        h1_glu = gated_linear_layer(inputs=h1, gates=h1_gates)
 
         d1= self.d1(h1_glu)
         d2= self.d2(d1)
@@ -247,7 +246,7 @@ class Discriminator(Model):
         inputs = tf.expand_dims(x, -1)
         h1 = self.h1(inputs)
         h1_gates = self.h1_gates(inputs)
-        h1_glu = gated_linear_layer(inputs=h1,gates = h1_gates,name= 'h1_glu')
+        h1_glu = gated_linear_layer(inputs=h1, gates=h1_gates)
         d1 = self.d1(h1_glu)
         d2 = self.d2(d1)
         d3 = self.d3(d2)

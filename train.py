@@ -149,17 +149,16 @@ def train(train_A_dir, train_B_dir, model_dir, model_name, random_seed, validati
 
 
 
-
-            if i % 50 == 0:
+            if i % 3 == 0:
                 #print('Iteration: %d, Generator Loss : %f, Discriminator Loss : %f' % (num_iterations, generator_loss, discriminator_loss))
                 print('Iteration: {:07d}, Generator Learning Rate: {:.7f}, Discriminator Learning Rate: {:.7f}, Generator Loss : {:.3f}, Discriminator Loss : {:.3f}'.format(num_iterations, generator_learning_rate, discriminator_learning_rate, generator_loss, discriminator_loss))
-
-        model.save_model(directory = model_dir, filename = model_name)
 
         end_time_epoch = time.time()
         time_elapsed_epoch = end_time_epoch - start_time_epoch
 
         print('Time Elapsed for This Epoch: %02d:%02d:%02d' % (time_elapsed_epoch // 3600, (time_elapsed_epoch % 3600 // 60), (time_elapsed_epoch % 60 // 1)))
+
+        model.save_model(directory=model_dir, filename=model_name)
 
         if validation_A_dir is not None:
             if epoch % 50 == 0:
@@ -205,8 +204,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description = 'Train CycleGAN model for datasets.')
 
-    train_A_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/super_short_trump"
-    train_B_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/super_short_trump"
+    train_A_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/trump"
+    train_B_dir_default = "/media/dan/Disk/ml+dl+dsp/Voice_Converter_CycleGAN/train/gaga"
     model_dir_default = './model/sf1_tf2'
     model_name_default = 'sf1_tf2.ckpt'
     random_seed_default = 0

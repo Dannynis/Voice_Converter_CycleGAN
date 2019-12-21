@@ -4,6 +4,7 @@ from tensorflow.keras import Model, layers
 from module import Discriminator, Generator
 from utils import l1_loss, l2_loss, cross_entropy_loss
 from datetime import datetime
+import time
 
 class CycleGAN:
 
@@ -164,11 +165,10 @@ class CycleGAN:
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-
-        self.generator_A2B.save(os.path.join (directory,filename+'GA2B'))
-        self.generator_B2A.save(os.path.join (directory,filename+'GB2A'))
-        self.discriminator_A.save(os.path.join (directory,filename+'DA'))
-        self.discriminator_B.save(os.path.join (directory,filename+'DB'))
+        self.generator_A2B.save_weights(os.path.join (directory,filename+'GA2B.h5'))
+        self.generator_B2A.save_weights(os.path.join (directory,filename+'GB2A.h5'))
+        self.discriminator_A.save_weights(os.path.join (directory,filename+'DA.h5'))
+        self.discriminator_B.save_weights(os.path.join (directory,filename+'DB.h5'))
 
         return os.path.join(directory, filename)
 
