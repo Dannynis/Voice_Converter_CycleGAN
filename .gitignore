@@ -17,3 +17,5 @@ model/
 *.ini
 
 .idea/
+
+*.v2
